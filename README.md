@@ -209,18 +209,24 @@ stopped. The 2 should be stored under `Images` and `Artifacts` folders either
 under a `UTM` top folder on the main volume of the host, or, preferably on an
 external drive. 
 
-**IMPORTANT!** The artifacts `.dmg` name should match that of the sandbox,
-otherwise the script that keeps the removal device busy on the guest to prevent
-its accidental removal will not be able to locate it.
+
 
 The following assumes that the new sandbox will be named `sandbox1`:
 
 - create the artifacts volume `sandbox1.dmg`
 
+  **IMPORTANT!** The artifacts `.dmg` name should match that of the sandbox,
+  otherwise the script that keeps the removal device busy on the guest to prevent
+  its accidental removal will not be able to locate it.
+
+  e.g.
+
+  ![Artifacts .dmg](images/artifacts-dmg.png)
+
 - open `UTM` and duplicate the `sandbox-ref`, it will be assigned `sandbox-ref 2` name automatically
 
 - edit `sandbox-ref 2` and
-  - change is name to `sandbox1`
+  - change its name to `sandbox1`
   - remove all (folder) sharing
   - add a new removable drive, selecting the `sandbox1.dmg` above; uncheck `Read Only?`
 
