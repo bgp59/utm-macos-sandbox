@@ -1,0 +1,23 @@
+# F/W rules for UTM isolation
+
+# Match the bridge used by the UTM, typically bridge100. When UTM
+# is running a guest OS, list bridges (other than bridge0) by:
+#   ifconfig | sed -n '/^bridge[1-9]/,/^[[:space:]]*status:/p'
+# and pick the one whose IP address matches the router of the guest 
+# OS.
+utm_if  = "bridge100"
+
+# Block all UTM IPv6
+block in quick on $utm_if inet6 all
+block out quick on $utm_if inet6 all
+
+# Block UTM -> standard private ranges, which typically includes the home LANs.
+# Add additional ranges as needed
+block in quick on $utm_if from any to { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }
+
+# Install:
+#   sudo cp com.utm.sandbox /etc/pf.anchors
+#   sudo chmod 644 /etc/pf.anchors/com.utm.sandbox
+#   sudo cat pf.conf-fragment >> /etc/pf.conf
+#
+# Activate: see com.apple.pfctlenable.plist

@@ -1,0 +1,4 @@
+
+# UTM sandbox anchor point
+anchor "com.utm.sandbox"
+load anchor "com.utm.sandbox" from "/etc/pf.anchors/com.utm.sandbox"
