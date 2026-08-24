@@ -5,19 +5,50 @@
 #   ifconfig | sed -n '/^bridge[1-9]/,/^[[:space:]]*status:/p'
 # and pick the one whose IP address matches the router of the guest 
 # OS.
-utm_if  = "bridge100"
+utm_if = "bridge100"
 
-# Block all UTM IPv6
-block in quick on $utm_if inet6 all
+# --- table of the guest's actual DNS resolvers ---
+table <allowed_dns> { 8.8.8.8, 1.1.1.1 }
+
+
+# --- table of ranges to always deny, both directions ---
+#       CIDR
+#       169.254.0.0/16 (link-local)
+#       100.64.0.0/10 (CGNAT range) — relevant if the host runs Tailscale or similar
+#       Multicast/broadcast (mDNS 224.0.0.251, SSDP 239.255.255.250)
+table <blocked_ranges> { \
+    10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, \
+    100.64.0.0/10, \
+    224.0.0.251, \
+    239.255.255.250 \
+}
+
+# --- IPv6: fully dead on this interface, both directions ---
+block in  quick on $utm_if inet6 all
 block out quick on $utm_if inet6 all
 
-# Block UTM -> standard private ranges, which typically includes the home LANs.
-# Add additional ranges as needed
-block in quick on $utm_if from any to { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }
+# --- explicit blocks first ---
+block in quick on $utm_if from any to <blocked_ranges>
+block out quick on $utm_if from <blocked_ranges> to any
+block out quick on $utm_if from any to 255.255.255.255      # broadcast
 
-# Install:
-#   sudo cp com.utm.sandbox /etc/pf.anchors
-#   sudo chmod 644 /etc/pf.anchors/com.utm.sandbox
-#   sudo cat pf.conf-fragment >> /etc/pf.conf
-#
-# Activate: see com.apple.pfctlenable.plist
+# --- default deny everything else on this interface ---
+block in  on $utm_if all
+block out on $utm_if all
+
+# --- explicit allows: DNS to your two resolvers only ---
+pass out quick on $utm_if proto udp from any to <allowed_dns> port 53
+pass out quick on $utm_if proto tcp from any to <allowed_dns> port 53
+pass in  quick on $utm_if proto udp from <allowed_dns> to any port 53
+pass in  quick on $utm_if proto tcp from <allowed_dns> to any port 53
+
+# --- general outbound internet (TCP handshake, UDP state) ---
+pass out quick on $utm_if proto tcp from any to any flags S/SA keep state
+pass out quick on $utm_if proto udp from any to any keep state
+
+# --- allow return traffic for connections the guest initiated ---
+pass in quick on $utm_if proto tcp from any to any flags S/SA keep state
+pass in quick on $utm_if proto udp from any to any keep state
+
+# --- everything else inbound (unsolicited) stays blocked by the default deny above ---
+

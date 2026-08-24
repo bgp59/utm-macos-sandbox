@@ -11,6 +11,7 @@
   - [Create a reference VM](#create-a-reference-vm)
   - [Setup the firewall on the host](#setup-the-firewall-on-the-host)
   - [Verify network access from the guest](#verify-network-access-from-the-guest)
+  - [Verify network access from the host](#verify-network-access-from-the-host)
   - [Create a sandbox from reference](#create-a-sandbox-from-reference)
 - [Accessing the artifacts on host](#accessing-the-artifacts-on-host)
 
@@ -23,7 +24,6 @@ This document provides guidelines for running MacOS on a
 creating a sandbox on the personal Mac where AI Agents could be run safely,
 without fear of them altering/accessing personal files, accessing other devices
 on the home network or altering the setup.
-
 
 ## Features
 
@@ -80,7 +80,7 @@ sudo pfctl -a com.utm.sandbox -F rules
     | Section | Parameter  | Suggestion |
     | ------- | ---------- | ---------- |
     | `Information` | `Name` | `sandbox-ref` |
-    | `Virtualization` | `Enable Sound`<br>`Enable Clipboard Sharing` | deselected<br>deselected|
+    | `Virtualization` | `Enable Sound`<br>`Enable Clipboard Sharing` | deselected<br>deselected |
     | `Network` | `Network Mode` | `Shared Network` |
     | `Sharing` | | add path to `guest` folder to make it easier to install needed files |
 
@@ -107,7 +107,10 @@ sudo pfctl -a com.utm.sandbox -F rules
     <a id="guest-network-settings"></a>![DNS](images/guest-network-settings-dns.png)
     ![IPv6](images/guest-network-settings-ipv6.png)
 
-  - install desired apps such as `brew`, `Visual Studio Code`, etc
+  - install `brew` and additional packages:
+    - `ptree`
+
+  - install other common apps such as `Visual Studio Code`, etc
 
   - create user `agentbox` (`Regular` type), intended for running agents without privileges.
 
@@ -180,18 +183,16 @@ otherwise proceed as follows:
 
     ```bash
     for ip in 192.168.50.201 192.168.50.1 192.168.64.1; do
-      echo "-----------------------------"
       ping -c 3 -W 200 $ip
     done
     ```
 
-  - verify that each DNS resolver (external) can be reached
+  - verify that each (external) DNS resolver can be reached
     e.g.
 
     ```bash
-    for dns in 8.8.8.8 1.1.1.1; do
-      echo "-----------------------------"
-      host $dns $dns
+    for dns_svr in 8.8.8.8 1.1.1.1; do
+      dig @$dns_svr example.com
     done
     ```
 
@@ -200,6 +201,67 @@ otherwise proceed as follows:
   | Host Speed Test | Guest Speed Test |
   | --------------- | ---------------- |
   | ![Host Speed Test](images/host-speed-test.png) | ![Guest Speed Test](images/guest-speed-test.png) |
+
+- verify that DNS Service Discovery does not find anything from the guest:
+
+  ```bash
+  dns-sd -B _services._dns-sd._udp
+  ```
+
+### Verify network access from the host
+
+- verify that the [guest](#guest-network-settings) IP address is not ping-able
+  from the host, e.g. for the case above:
+
+  ```bash
+  ping -c 2 -W 200 192.168.64.5  # actual IP may be different, check guest
+  ```
+
+- verify that `nmap` runing on host doesn't find anything on the
+  [guest](#guest-network-settings) network, e.g. for the case above:
+
+  ```bash
+  nmap -sL 192.168.64.0/24
+  ```
+
+- verify that DNS Service Discovery on the host does not find anything from the
+  guest; this may be a bit tedious since it should check service by service:
+
+  - find service registration visible on host:
+
+    ```bash
+    dns-sd -B _services._dns-sd._udp
+    ```
+
+    Sample output:
+
+    ```text
+    Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _alexa
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _smb
+    14:19:20.590  Add        3   1 .                    _tcp.local.          _ssh
+    14:19:20.590  Add        3   1 .                    _tcp.local.          _sftp-ssh
+    14:19:20.590  Add        3   1 .                    _tcp.local.          _airplay
+    14:19:20.590  Add        3   1 .                    _tcp.local.          _raop
+    14:19:20.590  Add        3   1 .                    _tcp.local.          _companion-link
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _ssh
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _sftp-ssh
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _airplay
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _raop
+    14:19:20.590  Add        3  11 .                    _tcp.local.          _companion-link
+    14:19:20.590  Add        3  20 .                    _tcp.local.          _ssh
+    14:19:20.590  Add        3  20 .                    _tcp.local.          _sftp-ssh
+    14:19:20.590  Add        3  20 .                    _tcp.local.          _airplay
+    14:19:20.590  Add        3  20 .                    _tcp.local.          _raop
+    14:19:20.590  Add        3  20 .                    _tcp.local.          _companion-link
+    14:19:20.590  Add        2  11 .                    _tcp.local.          _FC9F5ED42C8A
+    ```
+
+  - resolve service by service and verify that it doesn't report guest's name/IP:
+
+    ```bash
+    dns-sd -Z _ssh
+    ```
 
 ### Create a sandbox from reference
 

@@ -40,8 +40,31 @@ else
 fi
 echo
 
+echo "Tables for '$anchor':"
+tables=$(sudo pfctl -a $anchor -s Table 2>/dev/null)
+has_allowed_dns=
+has_blocked_ranges=
+for t in $tables; do
+    echo " $t"
+    ignore_table=
+    case "$t" in
+        allowed_dns) has_allowed_dns=1;;
+        blocked_ranges) has_blocked_ranges=1;;
+        *) ignore_table=1;;
+    esac
+    if [[ -z "$ignore_table" ]]; then
+        sudo pfctl -a $anchor -t $t -T show 2>/dev/null
+    fi
+done
+if [[ "$has_allowed_dns" = 1 && "$has_blocked_ranges" = 1 ]]; then
+    echo "Tables: OK"
+else
+    echo "Tables: not OK"
+fi
+echo
+
 echo "Rules for '$anchor':"
-sudo pfctl -a com.utm.sandbox -s r 2>/dev/null | (
+sudo pfctl -a $anchor -s r 2>/dev/null | (
     x=1
     while read line; do
         echo "$line"

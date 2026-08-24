@@ -14,4 +14,9 @@ if ! grep 'com.utm' /etc/pf.conf; then
 fi
 sudo cp com.apple.pfctlenable.plist /Library/LaunchDaemons
 sudo chmod 644 /Library/LaunchDaemons/com.apple.pfctlenable.plist
+
+sudo sudo pfctl -a com.utm.sandbox -F all
+
+sudo launchctl unload /Library/LaunchDaemons/com.apple.pfctlenable.plist
 sudo launchctl load /Library/LaunchDaemons/com.apple.pfctlenable.plist
+
