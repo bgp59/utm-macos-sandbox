@@ -115,7 +115,7 @@ sudo pfctl -a com.utm.sandbox -F rules
     ![IPv6](images/guest-network-settings-ipv6.png)
 
   - install `brew` and additional packages:
-    - `ptree`
+    - `pstree`
 
   - install other common apps such as `Visual Studio Code`, etc
 
@@ -342,7 +342,7 @@ To prevent attacks via metadata through Finder / Spotlight actions, the
 artifacts `.dmg` for a given sandbox should be mounted ro, noexec and with
 browsing and indexing disabled. To that end convenience scripts
 `mount-sandbox-artifacts.sh` and `eject-sandbox-artifacts.sh` are provided under
-`hosts`:
+`host`:
 
 ```text
 Usage: mount-sandbox-artifacts.sh [-w] [-x] PATH_TO_DMG
