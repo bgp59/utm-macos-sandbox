@@ -1,0 +1,173 @@
+[2026-08-27 15:14:12] ATTEMPT: Baseline recon: identify guest network and gateway (already gathered)
+[2026-08-27 15:14:12] COMMAND: ifconfig en0; netstat -rn
+[2026-08-27 15:14:12] RESULT: en0 inet 192.168.64.5/24; default gw 192.168.64.1 (VM NAT/bridge net). This is the guest-facing net, NOT the host LAN.
+[2026-08-27 15:14:12] VERDICT: INCONCLUSIVE (baseline)
+[2026-08-27 15:14:12] ATTEMPT: Read ARP cache to spot host-LAN neighbors leaking through
+[2026-08-27 15:14:12] COMMAND: arp -a
+[2026-08-27 15:14:12] RESULT: ? (192.168.64.1) at 9e:58:84:c0:48:64 on en0 ifscope [ethernet]|? (192.168.64.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]|mdns.mcast.net (224.0.0.251) at 1:0:5e:0:0:fb on en0 ifscope permanent [ethernet]|
+[2026-08-27 15:14:12] VERDICT: BLOCKED
+[2026-08-27 15:14:33] ATTEMPT: Inspect DNS resolver config for host-LAN router IP leakage
+[2026-08-27 15:14:33] COMMAND: scutil --dns | grep nameserver
+[2026-08-27 15:14:33] RESULT:   nameserver[0] : 8.8.8.8|  nameserver[1] : 1.1.1.1|
+[2026-08-27 15:14:33] VERDICT: PARTIAL
+[2026-08-27 15:14:33] ATTEMPT: Read DHCP lease for router/domain hints about host LAN
+[2026-08-27 15:14:33] COMMAND: ipconfig getpacket en0
+[2026-08-27 15:14:33] RESULT: server_identifier (ip): 192.168.64.1|router (ip_mult): {192.168.64.1}|domain_name_server (ip_mult): {192.168.64.1}|
+[2026-08-27 15:14:33] VERDICT: BLOCKED (only NAT gateway 192.168.64.1 shown)
+[2026-08-27 15:14:36] ATTEMPT: Traceroute to public IP to reveal host LAN gateway as a hop beyond the NAT
+[2026-08-27 15:14:36] COMMAND: traceroute -n -w1 -q1 -m6 8.8.8.8
+[2026-08-27 15:14:39] RESULT: traceroute to 8.8.8.8 (8.8.8.8), 6 hops max, 40 byte packets| 1  *| 2  *| 3  *| 4  68.87.227.197  18.049 ms| 5  68.87.194.105  18.337 ms| 6  68.85.86.5  15.952 ms|
+[2026-08-27 15:15:35] ATTEMPT: Passive host-LAN discovery via traceroute/DNS/DHCP
+[2026-08-27 15:15:35] COMMAND: traceroute -n 8.8.8.8; scutil --dns; ipconfig getpacket en0
+[2026-08-27 15:15:35] RESULT: traceroute hops1-3 suppressed then jump to public 68.86.248.13; DNS=8.8.8.8/1.1.1.1(public); DHCP router=192.168.64.1 only
+[2026-08-27 15:15:35] VERDICT: BLOCKED (host LAN range not discoverable from guest)
+[2026-08-27 15:15:46] ATTEMPT: Ping sweep of common host-LAN/ISP-router candidate IPs
+[2026-08-27 15:15:46] COMMAND: ping -c1 -t1 <candidate> for: 192.168.0.1 192.168.1.1 192.168.1.254 192.168.2.1 10.0.0.1 10.0.0.138 10.0.1.1 10.1.1.1 172.16.0.1 192.168.100.1 192.168.86.1
+[2026-08-27 15:15:57] RESULT:  192.168.0.1=down 192.168.1.1=down 192.168.1.254=down 192.168.2.1=down 10.0.0.1=down 10.0.0.138=down 10.0.1.1=down 10.1.1.1=down 172.16.0.1=down 192.168.100.1=down 192.168.86.1=down
+[2026-08-27 15:15:57] VERDICT: BLOCKED
+[2026-08-27 15:16:13] ATTEMPT: TCP-connect probe of candidate host-LAN routers on ssh(22)/http(80)/https(443)/smb(445)
+[2026-08-27 15:16:13] COMMAND: timeout 2 bash -c 'exec 3<>/dev/tcp/<ip>/<port>' for candidates 192.168.0.1 192.168.1.1 192.168.1.254 10.0.0.1 10.0.0.138 192.168.86.1 192.168.100.1 ports 22 80 443 445
+[2026-08-27 15:16:13] RESULT: (none OPEN => all closed/filtered)
+[2026-08-27 15:16:13] VERDICT: BLOCKED
+[2026-08-27 15:17:38] ATTEMPT: User supplied host-net info via ~/host-net-info
+[2026-08-27 15:17:38] COMMAND: cat ~/host-net-info
+[2026-08-27 15:17:38] RESULT: HOST=192.168.50.201 GW=192.168.50.1 NETWORK=192.168.50.0/24
+[2026-08-27 15:17:38] VERDICT: INCONCLUSIVE (info obtained; not self-discovered — good isolation)
+[2026-08-27 15:17:38] ATTEMPT: Check kernel route to host-LAN gateway (does guest have a direct path?)
+[2026-08-27 15:17:38] COMMAND: route -n get 192.168.50.1
+[2026-08-27 15:17:38] RESULT:    route to: 192.168.50.1|    gateway: 192.168.64.1|  interface: en0|
+[2026-08-27 15:17:38] VERDICT: INFO
+[2026-08-27 15:17:40] ATTEMPT: ICMP ping the ISP gateway and host on the host LAN
+[2026-08-27 15:17:40] COMMAND: ping -c2 -t1 192.168.50.1 ; ping -c2 -t1 192.168.50.201
+[2026-08-27 15:17:42] RESULT:  192.168.50.1=no-reply 192.168.50.201=no-reply
+[2026-08-27 15:17:42] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.1 service ssh/22 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.1/22'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.1 service http/80 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.1/80'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.1 service https/443 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.1/443'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.1 service smb/445 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.1/445'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.201 service ssh/22 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.201/22'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.201 service http/80 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.201/80'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.201 service https/443 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.201/443'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:10] ATTEMPT: Probe host-LAN 192.168.50.201 service smb/445 from guest
+[2026-08-27 15:18:10] COMMAND: timeout 3 bash -c 'exec 3<>/dev/tcp/192.168.50.201/445'
+[2026-08-27 15:18:10] RESULT: UNREACH/err(127)
+[2026-08-27 15:18:10] VERDICT: BLOCKED
+[2026-08-27 15:18:52] ATTEMPT: CORRECTION: prior port probes used 'timeout' which is absent on macOS (rc127) => invalid; re-running with nc
+[2026-08-27 15:18:52] COMMAND: n/a
+[2026-08-27 15:18:52] RESULT: timeout/gtimeout not installed; using /usr/bin/nc (BSD) with -G/-w connect timeouts
+[2026-08-27 15:18:52] VERDICT: INFO
+[2026-08-27 15:18:55] ATTEMPT: Re-probe host-LAN 192.168.50.1 ssh/22 via nc
+[2026-08-27 15:18:55] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 22
+[2026-08-27 15:18:55] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:18:55] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:18:58] ATTEMPT: Re-probe host-LAN 192.168.50.1 http/80 via nc
+[2026-08-27 15:18:58] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 80
+[2026-08-27 15:18:58] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:18:58] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:01] ATTEMPT: Re-probe host-LAN 192.168.50.1 https/443 via nc
+[2026-08-27 15:19:01] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 443
+[2026-08-27 15:19:01] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:01] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:04] ATTEMPT: Re-probe host-LAN 192.168.50.1 smb/445 via nc
+[2026-08-27 15:19:04] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 445
+[2026-08-27 15:19:04] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:04] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:07] ATTEMPT: Re-probe host-LAN 192.168.50.201 ssh/22 via nc
+[2026-08-27 15:19:07] COMMAND: nc -z -v -G 3 -w 3 192.168.50.201 22
+[2026-08-27 15:19:07] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:07] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:10] ATTEMPT: Re-probe host-LAN 192.168.50.201 http/80 via nc
+[2026-08-27 15:19:10] COMMAND: nc -z -v -G 3 -w 3 192.168.50.201 80
+[2026-08-27 15:19:10] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:11] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:14] ATTEMPT: Re-probe host-LAN 192.168.50.201 https/443 via nc
+[2026-08-27 15:19:14] COMMAND: nc -z -v -G 3 -w 3 192.168.50.201 443
+[2026-08-27 15:19:14] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:14] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:17] ATTEMPT: Re-probe host-LAN 192.168.50.201 smb/445 via nc
+[2026-08-27 15:19:17] COMMAND: nc -z -v -G 3 -w 3 192.168.50.201 445
+[2026-08-27 15:19:17] RESULT: FILTERED(timeout) (elapsed 3s)
+[2026-08-27 15:19:17] VERDICT: BLOCKED (nc probe = FILTERED/timeout)
+[2026-08-27 15:19:30] VERDICT: All 8 host-LAN probes (GW 192.168.50.1 + HOST 192.168.50.201 on 22/80/443/445) = FILTERED/timeout => BLOCKED. No host-network device reachable from guest.
+[2026-08-27 15:19:33] ATTEMPT: Extra probe GW 192.168.50.1 port 53
+[2026-08-27 15:19:33] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 53
+[2026-08-27 15:19:33] RESULT: nc: connectx to 192.168.50.1 port 53 (tcp) failed: Operation timed out
+[2026-08-27 15:19:33] VERDICT: BLOCKED
+[2026-08-27 15:19:36] ATTEMPT: Extra probe GW 192.168.50.1 port 8080
+[2026-08-27 15:19:36] COMMAND: nc -z -v -G 3 -w 3 192.168.50.1 8080
+[2026-08-27 15:19:36] RESULT: nc: connectx to 192.168.50.1 port 8080 (tcp) failed: Operation timed o
+[2026-08-27 15:19:36] VERDICT: BLOCKED
+
+================================================================================
+SUMMARY
+================================================================================
+Objective: from inside the guest VM (192.168.64.5/24, NAT gw 192.168.64.1),
+attempt to discover and reach devices on the *host's* physical LAN
+(192.168.50.0/24), specifically the ISP router at 192.168.50.1 on
+ssh/http/https/smb, plus host 192.168.50.201.
+
+Discovery phase (passive + active): The guest could NOT self-discover the host
+LAN. Interfaces, routes, ARP cache, DHCP lease (option 3/6) and DNS config all
+reference only the NAT segment 192.168.64.0/24 and gateway 192.168.64.1. DNS
+servers are public (8.8.8.8/1.1.1.1). Traceroute to 8.8.8.8 suppresses hops 1-3
+(NAT gw + host LAN router do not decrement/return TTL) and then jumps straight
+to the public ISP backbone (68.86.x.x), so the 192.168.50.0/24 range never
+leaks. Blind ICMP + TCP sweeps of 11 common RFC1918 gateway IPs found nothing.
+
+Reachability phase (host-net info supplied via ~/host-net-info): kernel routes
+traffic for 192.168.50.1 via the NAT gateway 192.168.64.1 out en0 (no direct L2
+adjacency). ICMP to the gateway and host: no reply. TCP connect probes to
+192.168.50.1 and 192.168.50.201 on 22(ssh)/80(http)/443(https)/445(smb) — plus
+53 and 8080 on the gateway — ALL returned connection timeout (filtered), 3s
+each. No refusals (which would imply a reachable-but-closed host), no opens.
+
+Tooling note: an initial round of TCP probes used `timeout`, which is NOT
+installed on macOS; those calls exited 127 without connecting and were invalid.
+Probes were re-run with the BSD `nc` (-G/-w connect timeouts); the FILTERED
+results above are from the valid nc runs.
+
+VERDICT: BLOCKED. The Apple Virtualization NAT correctly isolates the guest from
+the host's physical LAN. The guest cannot enumerate the host network and cannot
+reach the ISP router or any host-LAN device on the tested services. 24 distinct
+probes/attempts, 0 successes. This is the desired secure outcome.
+
+--------------------------------------------------------------------------------
+RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Keep NAT (not bridged) networking for untrusted guests. A bridged adapter
+   would place the guest directly on 192.168.50.0/24 and expose the ISP router
+   and every LAN device (this test would then likely SUCCEED). Verify no VM is
+   configured with a bridged/host-LAN interface.
+2. Defense-in-depth: even behind NAT, add host-side pf/firewall rules that DROP
+   forwarded traffic from the guest subnet (192.168.64.0/24) destined to the
+   host LAN (192.168.50.0/24), so a NAT/forwarding misconfig can't expose the
+   LAN. Explicitly block RFC1918 dest ranges from the guest except the internet
+   path.
+3. Harden the ISP router regardless: it should not expose ssh/http/https/smb to
+   the internal LAN without auth; disable WAN-side management; SMB (445) on a
+   consumer router is unusual — investigate/close it.
+4. Segment IoT/host devices onto a separate VLAN/SSID from any machine that runs
+   untrusted VMs, limiting blast radius if guest isolation ever fails.
+5. Monitor: log/alert on host forwarding of guest-subnet packets toward the LAN;
+   under correct NAT isolation there should be none.
