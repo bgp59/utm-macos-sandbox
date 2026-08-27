@@ -6,7 +6,7 @@
 - [Scope](#scope)
 - [Features](#features)
 - [Setup Steps](#setup-steps)
-  - [Install UTM](#install-utm)
+  - [Install and configure UTM](#install-and-configure-utm)
   - [Prepare the external volume](#prepare-the-external-volume)
   - [Create a reference VM](#create-a-reference-vm)
   - [Setup the firewall on the host](#setup-the-firewall-on-the-host)
@@ -14,6 +14,7 @@
   - [Verify network access from the host](#verify-network-access-from-the-host)
   - [Create a sandbox from reference](#create-a-sandbox-from-reference)
 - [Accessing the artifacts on host](#accessing-the-artifacts-on-host)
+- [Security Audit](#security-audit)
 
 <!-- /TOC -->
 
@@ -39,9 +40,15 @@ on the home network or altering the setup.
 
 **NOTE!** Throughout the rest of the document `host` refers to the MacOS on the computer running (hosting) the VM whereas `guest` refers to the MacOS inside the VM.
 
-### Install UTM
+### Install and configure UTM
 
 Download it from [UTM](https://mac.getutm.app/) or, to be nicer and to reward the effort behind it, from [App Mac Store](https://apps.apple.com/us/app/utm-virtual-machines/id1538878817?mt=12).
+
+Recommended UTM settings:
+
+| Section | Parameter | Suggestion |
+| ------- | --------- | ---------- |
+| `Network` | `Regenerate MAC addresses on clone` | `Enabled` |
 
 ### Prepare the external volume
 
@@ -112,7 +119,7 @@ sudo pfctl -a com.utm.sandbox -F rules
 
   - install other common apps such as `Visual Studio Code`, etc
 
-  - create user `agentbox` (`Regular` type), intended for running agents without privileges.
+  - create user `aiagent` (`Regular` type), intended for running agents without privileges.
 
   - set up the desktop appearance for each user
 
@@ -168,6 +175,11 @@ otherwise proceed as follows:
   cd host
   ./check-host-sandbox-fw.sh
   ```
+
+**IMPORTANT!** Operating system updates may alter `/etc/pf.conf` and disable the
+firewall. Always run the install and check scripts above on the host after an
+upgrade, **before** starting UTM.
+
 
 ### Verify network access from the guest
 
@@ -269,9 +281,7 @@ The VM will mount `.dmg` based volumes, one for the guest OS and a second one
 for transferring artifacts from the guest to the host, only when the VM is
 stopped. The 2 should be stored under `Images` and `Artifacts` folders either
 under a `UTM` top folder on the main volume of the host, or, preferably on an
-external drive. 
-
-
+external drive.
 
 The following assumes that the new sandbox will be named `sandbox1`:
 
@@ -329,17 +339,23 @@ e.g.
 ## Accessing the artifacts on host
 
 To prevent attacks via metadata through Finder / Spotlight actions, the
-artifacts `.dmg` for a given sandbox should be mounted with browsing and
-indexing disabled. To that end convenience scripts `mount-sandbox-artifacts.sh`
-and `eject-sandbox-artifacts.sh` are provided under `hosts`:
+artifacts `.dmg` for a given sandbox should be mounted ro, noexec and with
+browsing and indexing disabled. To that end convenience scripts
+`mount-sandbox-artifacts.sh` and `eject-sandbox-artifacts.sh` are provided under
+`hosts`:
 
 ```text
-Usage: mount-sandbox-artifacts.sh PATH_TO_DMG [ro]
+Usage: mount-sandbox-artifacts.sh [-w] [-x] PATH_TO_DMG
 
 Mount PATH_TO_DMG to $SANDBOX_ARTIFACTS_ROOT/BASENAME, where:
 
     SANDBOX_ARTIFACTS_ROOT defaults to $HOME/Sandbox/Artifacts
     BASENAME is basename of PATH_TO_DMG
+
+Flags:
+    -w mount writeable, default R/O
+    -x mount permitting execution, default noexec
+
 ```
 
 ```text
@@ -352,7 +368,9 @@ Eject $SANDBOX_ARTIFACTS_ROOT/SANDBOX_NAME, where
 
 **IMPORTANT!** While `mount-sandbox-artifacts.sh` will check if the `.dmg` is in
 use by the VM, so it will not mount it, the VM does not make a similar check.
-Always verify before starting the VM, for instance by running `hdiutil info`.
+Always verify before starting the VM, for instance by running `hdiutil info`; if
+any of the `image-path` matches the specific `.dmg` then then run the eject
+command above first.
 
 e.g.
 
@@ -370,3 +388,18 @@ image-alias     : /Volumes/UTM 1/Artifacts/sandbox1.dmg
 /dev/disk7s1	41504653-0000-11AA-AA11-00306543ECAC	/Users/emy/Sandbox/Artifacts/sandbox1
 ```
 
+## Security Audit
+
+The security audit was conducted using Claude Code instructed to run the
+`taskN.md` prompts in `/Users/Shared/security/prompts`. The latter are installed
+from [guest/security/prompts](guest/security/prompts) during the guest setup.
+
+The audit was conducted as `aiagent` user on VM cloned from `sandbox-ref`
+specifically for this task: `sandbox-sec-audit`.
+
+The results can by found under [security-audit](security-audit).
+
+Note about `DHCP` `sname` [flagged](security-audit/task1/sandbox-test.log#281)
+by the report: it is very hard to change it because it is dynamically controlled
+by `UTM` and the latter does not expose a way to set options. Since exposing the
+name of the host machine is a low risk, it can probably be ignored.

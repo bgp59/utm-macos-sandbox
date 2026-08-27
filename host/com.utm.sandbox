@@ -28,27 +28,12 @@ block in  quick on $utm_if inet6 all
 block out quick on $utm_if inet6 all
 
 # --- explicit blocks first ---
-block in quick on $utm_if from any to <blocked_ranges>
+block in  quick on $utm_if from any to <blocked_ranges>
 block out quick on $utm_if from <blocked_ranges> to any
 block out quick on $utm_if from any to 255.255.255.255      # broadcast
 
-# --- default deny everything else on this interface ---
-block in  on $utm_if all
-block out on $utm_if all
-
-# --- explicit allows: DNS to your two resolvers only ---
-pass out quick on $utm_if proto udp from any to <allowed_dns> port 53
-pass out quick on $utm_if proto tcp from any to <allowed_dns> port 53
-pass in  quick on $utm_if proto udp from <allowed_dns> to any port 53
-pass in  quick on $utm_if proto tcp from <allowed_dns> to any port 53
-
-# --- general outbound internet (TCP handshake, UDP state) ---
-pass out quick on $utm_if proto tcp from any to any flags S/SA keep state
-pass out quick on $utm_if proto udp from any to any keep state
-
-# --- allow return traffic for connections the guest initiated ---
-pass in quick on $utm_if proto tcp from any to any flags S/SA keep state
-pass in quick on $utm_if proto udp from any to any keep state
-
-# --- everything else inbound (unsolicited) stays blocked by the default deny above ---
-
+# --- allow only the official DNS servers ---
+block out quick on $utm_if proto udp from ! <allowed_dns> port 53 to any 
+block out quick on $utm_if proto tcp from ! <allowed_dns> port 53 to any 
+block in  quick on $utm_if proto udp from any to ! <allowed_dns> port 53
+block in  quick on $utm_if proto tcp from any to ! <allowed_dns> port 53

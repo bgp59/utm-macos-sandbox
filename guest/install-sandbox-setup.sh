@@ -11,8 +11,11 @@ sudo cp sandbox-setup.sh set-sandbox-name.sh /Library/Scripts/SandboxSetup
 sudo chmod +x /Library/Scripts/SandboxSetup/sandbox-setup.sh /Library/Scripts/SandboxSetup/set-sandbox-name.sh
 sudo cp com.utm.SandboxSetup.plist /Library/LaunchDaemons
 
+rsync -plrtHS security/ /Users/Shared/security
+
 if [[ -n "$sandbox_name" ]]; then
     sudo bash -c "echo '$sandbox_name' > /Library/Scripts/SandboxSetup/sandbox-name"
 fi
 
+(set +e; sudo launchctl unload -w /Library/LaunchDaemons/com.utm.SandboxSetup.plist; exit 0)
 sudo launchctl load -w /Library/LaunchDaemons/com.utm.SandboxSetup.plist

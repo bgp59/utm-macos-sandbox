@@ -20,8 +20,11 @@ done
 sandbox_name=$(cat "$this_dir/sandbox-name")
 
 if [[ -n "$sandbox_name" ]]; then
+    scutil --set ComputerName "$sandbox_name"
+    scutil --set LocalHostName "$sandbox_name.local"
     scutil --set HostName "$sandbox_name"
-
+    dscacheutil -flushcache
+    
     # Keep the artifacts volume busy to prevent accidental ejection:
     artifacts_volume="/Volumes/$sandbox_name"
     while [[ ! -d "$artifacts_volume" ]]; do sleep 1; done
