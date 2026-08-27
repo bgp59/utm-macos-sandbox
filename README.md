@@ -399,7 +399,7 @@ specifically for this task: `sandbox-sec-audit`.
 
 The results can by found under [security-audit](security-audit).
 
-Note about `DHCP` `sname` [flagged](security-audit/task1/sandbox-test.log#281)
+Note about `DHCP` `sname` [flagged](security-audit/task1/sandbox-test.log#L281)
 by the report: it is very hard to change it because it is dynamically controlled
 by `UTM` and the latter does not expose a way to set options. Since exposing the
 name of the host machine is a low risk, it can probably be ignored.
