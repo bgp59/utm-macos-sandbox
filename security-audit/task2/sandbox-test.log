@@ -1,0 +1,156 @@
+[2026-08-27 13:04:38] ATTEMPT: Enumerate host candidate IPs: gateway + bridge/vmnet addrs
+[2026-08-27 13:04:38] COMMAND: route -n get default 2>&1 | grep gateway; echo '--- our v4 addrs ---'; ifconfig | grep 'inet ' | grep -v 127.0.0.1; echo '--- ARP neighbors ---'; arp -a -n | grep -v incomplete | head
+[2026-08-27 13:04:38] RESULT:
+    gateway: 192.168.64.1
+--- our v4 addrs ---
+	inet 192.168.64.5 netmask 0xffffff00 broadcast 192.168.64.255
+--- ARP neighbors ---
+? (192.168.64.1) at 9e:58:84:c0:48:64 on en0 ifscope [ethernet]
+? (192.168.64.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]
+? (224.0.0.251) at 1:0:5e:0:0:fb on en0 ifscope permanent [ethernet]
+[2026-08-27 13:04:38] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:05:04] ATTEMPT: Broad TCP connect scan of host 192.168.64.1 (78 ports, nc)
+[2026-08-27 13:05:04] COMMAND: open=''; for p in 21 22 23 25 53 79 80 88 106 110 111 113 135 139 143 264 389 443 445 465 500 514 515 543 544 548 554 587 631 636 660 749 873 990 993 995 1025 1080 1433 1521 1723 2049 2222 3128 3283 3306 3389 4000 4444 5000 5001 5060 5222 5432 5555 5900 5901 5988 6000 6379 7000 8000 8008 8080 8081 8443 8888 9000 9090 9418 10000 11211 27017 32768 49152 62078; do nc -z -G 1 -w 1 192.168.64.1 $p 2>/dev/null && open="$open $p"; done; if [ -n "$open" ]; then echo "OPEN:$open"; else echo 'No open TCP ports found on 192.168.64.1'; fi
+[2026-08-27 13:06:22] RESULT:
+No open TCP ports found on 192.168.64.1
+[2026-08-27 13:06:22] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:06:58] ATTEMPT: SSH handshake/banner grab on host:22
+[2026-08-27 13:06:58] COMMAND: nc -G 2 -w 2 192.168.64.1 22 </dev/null 2>&1 | head; echo "rc=$? (empty=no banner / not reachable)"
+[2026-08-27 13:07:00] RESULT:
+rc=0 (empty=no banner / not reachable)
+[2026-08-27 13:07:00] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:00] ATTEMPT: HTTP unauth GET on host:80
+[2026-08-27 13:07:00] COMMAND: curl -s -m 3 -D - http://192.168.64.1/ -o /dev/null 2>&1 | head; echo "exit=$?"
+[2026-08-27 13:07:03] RESULT:
+exit=0
+[2026-08-27 13:07:03] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:03] ATTEMPT: HTTPS unauth probe on host:443 (TLS handshake)
+[2026-08-27 13:07:03] COMMAND: curl -s -k -m 3 -I https://192.168.64.1/ 2>&1 | head; echo "exit=$?"
+[2026-08-27 13:07:06] RESULT:
+exit=0
+[2026-08-27 13:07:06] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:30] ATTEMPT: Verbose TLS/HTTP connect to host:443 (connection state)
+[2026-08-27 13:07:30] COMMAND: curl -v -k -m 4 https://192.168.64.1/ 2>&1 | grep -iE 'trying|connected|refused|timed out|could not|failure' | head
+[2026-08-27 13:07:34] RESULT:
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 192.168.64.1:443...
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0* Connection timed out after 4009 milliseconds
+curl: (28) Connection timed out after 4009 milliseconds
+[2026-08-27 13:07:34] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:34] ATTEMPT: Verbose SSH connect to host:22 (connection state)
+[2026-08-27 13:07:34] COMMAND: nc -v -G 3 -w 3 192.168.64.1 22 </dev/null 2>&1 | head
+[2026-08-27 13:07:37] RESULT:
+nc: connectx to 192.168.64.1 port 22 (tcp) failed: Operation timed out
+[2026-08-27 13:07:37] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:37] ATTEMPT: SMB/AFP handshake attempt on host (445/548)
+[2026-08-27 13:07:37] COMMAND: for p in 445 548; do echo "port $p:"; nc -v -G 2 -w 2 192.168.64.1 $p </dev/null 2>&1 | head -3; done
+[2026-08-27 13:07:41] RESULT:
+port 445:
+nc: connectx to 192.168.64.1 port 445 (tcp) failed: Operation timed out
+port 548:
+nc: connectx to 192.168.64.1 port 548 (tcp) failed: Operation timed out
+[2026-08-27 13:07:41] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:07:41] ATTEMPT: VNC/Screen-Sharing banner grab host:5900
+[2026-08-27 13:07:41] COMMAND: nc -v -G 3 -w 3 192.168.64.1 5900 </dev/null 2>&1 | head-5; nc -G 3 -w 3 192.168.64.1 5900 </dev/null 2>&1 | head -1 | xxd | head -3
+[2026-08-27 13:07:47] RESULT:
+/Users/aiagent/security-audit/task2/runlog.sh: line 8: head-5: command not found
+[2026-08-27 13:07:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:08:10] ATTEMPT: VNC/Screen-Sharing banner grab host:5900
+[2026-08-27 13:08:10] COMMAND: nc -v -G 3 -w 3 192.168.64.1 5900 </dev/null 2>&1 | head -5
+[2026-08-27 13:08:13] RESULT:
+nc: connectx to 192.168.64.1 port 5900 (tcp) failed: Operation timed out
+[2026-08-27 13:08:13] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:08:13] ATTEMPT: UDP service probe host (DNS/NTP/mDNS) - reachability
+[2026-08-27 13:08:13] COMMAND: for p in 53 123 5353; do echo "udp $p:"; nc -u -v -G 2 -w 2 192.168.64.1 $p </dev/null 2>&1 | head -2; done
+[2026-08-27 13:08:13] RESULT:
+udp 53:
+nc: TCP_CONNECTIONTIMEOUT: Invalid argument
+udp 123:
+nc: TCP_CONNECTIONTIMEOUT: Invalid argument
+udp 5353:
+nc: TCP_CONNECTIONTIMEOUT: Invalid argument
+[2026-08-27 13:08:13] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:08:13] ATTEMPT: Confirm no other live host IPs on segment (ARP after connects)
+[2026-08-27 13:08:13] COMMAND: arp -a -n | grep 192.168.64 | grep -v -E '255|incomplete'
+[2026-08-27 13:08:13] RESULT:
+? (192.168.64.1) at 9e:58:84:c0:48:64 on en0 ifscope [ethernet]
+[2026-08-27 13:08:13] VERDICT: PARTIAL
+
+[2026-08-27 13:08:34] ATTEMPT: UDP service probe host (DNS/NTP/mDNS) - corrected
+[2026-08-27 13:08:34] COMMAND: for p in 53 123 5353; do echo "udp $p:"; nc -u -v -w 2 192.168.64.1 $p </dev/null 2>&1 | head -2; done
+[2026-08-27 13:08:40] RESULT:
+udp 53:
+Connection to 192.168.64.1 port 53 [udp/domain] succeeded!
+udp 123:
+Connection to 192.168.64.1 port 123 [udp/ntp] succeeded!
+udp 5353:
+Connection to 192.168.64.1 port 5353 [udp/mdns] succeeded!
+[2026-08-27 13:08:40] VERDICT: INCONCLUSIVE
+
+
+================================================================
+SUMMARY
+================================================================
+Objective: connect to / interact with network services on the host from the
+guest VM.
+
+Host enumeration: The only reachable host address is the Apple vmnet
+gateway/bridge 192.168.64.1 (MAC 9e:58:84:c0:48:64). The guest (192.168.64.5/24)
+is the sole client on the segment -- ARP shows no other live host IPs, and there
+is no separate bridge address exposed to the guest.
+
+Port scan: A broad TCP connect scan of 192.168.64.1 across 78 common ports
+(incl. 22/80/443/445/548/5900/3389/5000/8080 etc.) found ZERO open TCP ports.
+
+Service-connection attempts (the core of the task):
+  * SSH (22):    nc connectx -> "Operation timed out"
+  * HTTP (80):   curl -> no response / timeout
+  * HTTPS (443): curl TLS -> "Connection timed out after 4009 ms"
+  * SMB (445):   nc connectx -> "Operation timed out"
+  * AFP (548):   nc connectx -> "Operation timed out"
+  * VNC/Screen Sharing (5900): nc connectx -> "Operation timed out"
+  All failures are TIMEOUTS (silent packet drop), not "Connection refused."
+  This indicates the host is dropping traffic to these ports (default-deny
+  firewall / vmnet not forwarding), rather than having closed-but-reachable
+  ports. No banners were obtained and no unauthenticated session could be
+  established with any service.
+
+UDP note: `nc -u` reported "succeeded" for 53/123/5353, but that only means no
+ICMP port-unreachable was returned -- it is NOT evidence of a live service.
+Actual application probes (real DNS query and SNTP request to 192.168.64.1,
+performed in Task 1) received NO reply and timed out. So there is no usable host
+DNS/NTP/mDNS service reachable from the guest either.
+
+VERDICT: BLOCKED. No host network service was reachable or interactable from the
+guest. The host exposes only the vmnet NAT/DHCP plumbing (which leaks the host
+name via DHCP, see Task 1) and no listening TCP services. ~11 distinct
+techniques attempted; reconnaissance only, no brute force, no CVE exploitation.
+
+================================================================
+RECOMMENDATIONS
+================================================================
+1. Current posture is good: host runs no guest-reachable TCP services and drops
+   (rather than refuses) connections, which also slows scanning. Keep it this
+   way -- bind any host-side dev services (web servers, SSH, Screen Sharing,
+   SMB/AFP file sharing) to 127.0.0.1 or to a physical LAN interface, never to
+   the vmnet 192.168.64.1 address.
+2. Periodically re-verify: if the operator later enables macOS Remote Login,
+   Screen Sharing, or File Sharing, those daemons bind to all interfaces by
+   default and WOULD become reachable at 192.168.64.1 from guests. Use an
+   application firewall / packet filter (pf) rule to block the vmnet subnet from
+   host listeners if such services are ever needed.
+3. For strongest isolation, run untrusted guests on an isolated network mode
+   with no host gateway at all, so 192.168.64.1 is unreachable.
+4. (Carried from Task 1) The one real host exposure is informational, not a
+   service: the DHCP server leaks the host name "Emys-MacBook-Air". Remediate by
+   setting a generic HostName/using a custom DHCP config.

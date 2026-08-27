@@ -1,0 +1,327 @@
+[2026-08-27 12:53:05] ATTEMPT: Guest network interfaces/IP config (find our subnet & gateway)
+[2026-08-27 12:53:05] COMMAND: ifconfig | grep -A4 -E '^en|^bridge|^utun' | head -40
+[2026-08-27 12:53:05] RESULT:
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+	options=463<RXCSUM,TXCSUM,TSO4,TSO6,CHANNEL_IO>
+	ether ee:3c:75:32:5d:07
+	inet 192.168.64.5 netmask 0xffffff00 broadcast 192.168.64.255
+	media: autoselect <full-duplex,flow-control>
+--
+en1: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+	options=400<CHANNEL_IO>
+	ether 72:ec:af:65:25:01
+	nd6 options=201<PERFORMNUD,DAD>
+	media: none
+--
+utun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380
+	inet6 fe80::2e2:c9c1:913:3707%utun0 prefixlen 64 scopeid 0x7 
+	nd6 options=201<PERFORMNUD,DAD>
+utun1: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 2000
+	inet6 fe80::eae0:325b:9a4a:d32a%utun1 prefixlen 64 scopeid 0x8 
+	nd6 options=201<PERFORMNUD,DAD>
+utun2: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1000
+	inet6 fe80::ce81:b1c:bd2c:69e%utun2 prefixlen 64 scopeid 0x9 
+[2026-08-27 12:53:05] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:53:05] ATTEMPT: Default route / gateway address
+[2026-08-27 12:53:05] COMMAND: netstat -rn | grep -E 'default|^0/0' | head
+[2026-08-27 12:53:06] RESULT:
+default            192.168.64.1       UGScg                 en0       
+default                                 fe80::%utun0                            UGcIg               utun0       
+default                                 fe80::%utun1                            UGcIg               utun1       
+default                                 fe80::%utun2                            UGcIg               utun2       
+default                                 fe80::%utun3                            UGcIg               utun3       
+[2026-08-27 12:53:06] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:53:06] ATTEMPT: Route to default gateway (get gw IP)
+[2026-08-27 12:53:06] COMMAND: route -n get default 2>&1 | head -15
+[2026-08-27 12:53:06] RESULT:
+   route to: default
+destination: default
+       mask: default
+    gateway: 192.168.64.1
+  interface: en0
+      flags: <UP,GATEWAY,DONE,STATIC,PRCLONING,GLOBAL>
+ recvpipe  sendpipe  ssthresh  rtt,msec    rttvar  hopcount      mtu     expire
+       0         0         0         0         0         0      1500         0 
+[2026-08-27 12:53:06] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:53:33] ATTEMPT: Ping gateway (host) for TTL-based OS fingerprint
+[2026-08-27 12:53:33] COMMAND: ping -c 3 192.168.64.1
+[2026-08-27 12:53:47] RESULT:
+PING 192.168.64.1 (192.168.64.1): 56 data bytes
+Request timeout for icmp_seq 0
+Request timeout for icmp_seq 1
+
+--- 192.168.64.1 ping statistics ---
+3 packets transmitted, 0 packets received, 100.0% packet loss
+[2026-08-27 12:53:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:53:47] ATTEMPT: ARP table entries (host MAC on our subnet)
+[2026-08-27 12:53:47] COMMAND: arp -a -n | head -20
+[2026-08-27 12:53:47] RESULT:
+? (192.168.64.1) at 9e:58:84:c0:48:64 on en0 ifscope [ethernet]
+? (192.168.64.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]
+? (224.0.0.251) at 1:0:5e:0:0:fb on en0 ifscope permanent [ethernet]
+[2026-08-27 12:53:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:53:47] ATTEMPT: Reverse DNS of gateway to reveal host hostname
+[2026-08-27 12:53:47] COMMAND: dig +short -x 192.168.64.1 @192.168.64.1; host 192.168.64.1 2>&1 | head
+[2026-08-27 12:54:02] RESULT:
+;; connection timed out; no servers could be reached
+Host 1.64.168.192.in-addr.arpa. not found: 3(NXDOMAIN)
+[2026-08-27 12:54:02] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:54:23] ATTEMPT: DHCP lease info (may name host/DNS/router)
+[2026-08-27 12:54:23] COMMAND: ipconfig getpacket en0 2>&1 | head -30
+[2026-08-27 12:54:23] RESULT:
+op = BOOTREPLY
+htype = 1
+flags = 0x0
+hlen = 6
+hops = 0
+xid = 0x7b9770f1
+secs = 0
+ciaddr = 0.0.0.0
+yiaddr = 192.168.64.5
+siaddr = 192.168.64.1
+giaddr = 0.0.0.0
+chaddr = ee:3c:75:32:5d:7
+sname = Emys-MacBook-Air
+file = 
+options:
+Options count is 7
+dhcp_message_type (uint8): ACK 0x5
+server_identifier (ip): 192.168.64.1
+lease_time (uint32): 0xe10
+subnet_mask (ip): 255.255.255.0
+[2026-08-27 12:54:23] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:54:23] ATTEMPT: Configured DNS resolvers (may point at host)
+[2026-08-27 12:54:23] COMMAND: scutil --dns 2>&1 | grep -E 'nameserver|domain' | head -15; echo '--- resolv.conf ---'; cat /etc/resolv.conf 2>&1 | head
+[2026-08-27 12:54:23] RESULT:
+  nameserver[0] : 8.8.8.8
+  nameserver[1] : 1.1.1.1
+  domain   : local
+  domain   : 254.169.in-addr.arpa
+  domain   : 8.e.f.ip6.arpa
+  domain   : 9.e.f.ip6.arpa
+  domain   : a.e.f.ip6.arpa
+  domain   : b.e.f.ip6.arpa
+  nameserver[0] : 8.8.8.8
+  nameserver[1] : 1.1.1.1
+--- resolv.conf ---
+#
+# macOS Notice
+#
+# This file is not consulted for DNS hostname resolution, address
+# resolution, or the DNS query routing mechanism used by most
+# processes on this system.
+#
+# To view the DNS configuration used by this system, use:
+#   scutil --dns
+[2026-08-27 12:54:23] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:54:48] ATTEMPT: HOST HOSTNAME via DHCP sname field
+[2026-08-27 12:54:48] COMMAND: ipconfig getpacket en0 2>&1 | grep -E 'sname|siaddr|server_identifier'
+[2026-08-27 12:54:48] RESULT:
+siaddr = 192.168.64.1
+sname = Emys-MacBook-Air
+server_identifier (ip): 192.168.64.1
+[2026-08-27 12:54:48] VERDICT: SUCCEEDED
+
+[2026-08-27 12:54:48] ATTEMPT: mDNS/Bonjour browse for advertised services (5s)
+[2026-08-27 12:54:48] COMMAND: timeout 6 dns-sd -B _services._dns-sd._udp local. 2>&1 | head -20
+[2026-08-27 12:54:48] RESULT:
+/Users/aiagent/security-audit/task1/runlog.sh: line 8: timeout: command not found
+[2026-08-27 12:54:48] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:54:48] ATTEMPT: mDNS enumerate hostnames on link (dns-sd -Z / avahi if present)
+[2026-08-27 12:54:48] COMMAND: which avahi-browse dns-sd; timeout 6 dns-sd -B _ssh._tcp 2>&1 | head -15
+[2026-08-27 12:54:48] RESULT:
+/usr/bin/dns-sd
+/Users/aiagent/security-audit/task1/runlog.sh: line 8: timeout: command not found
+[2026-08-27 12:54:48] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:55:11] ATTEMPT: mDNS service-type enumeration (Bonjour)
+[2026-08-27 12:55:11] COMMAND: to 5 dns-sd -B _services._dns-sd._udp local. 2>&1 | head -25
+[2026-08-27 12:55:17] RESULT:
+
+[2026-08-27 12:55:17] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:55:39] ATTEMPT: mDNS browse _services._dns-sd._udp (file-buffered)
+[2026-08-27 12:55:39] COMMAND: tf 5 /tmp/mdns1.txt dns-sd -B _services._dns-sd._udp local.; cat /tmp/mdns1.txt | head -25
+[2026-08-27 12:55:44] RESULT:
+
+[2026-08-27 12:55:44] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:55:44] ATTEMPT: Resolve host mDNS name Emys-MacBook-Air.local -> IP
+[2026-08-27 12:55:44] COMMAND: dns-sd -q Emys-MacBook-Air.local >/tmp/mdns2.txt 2>&1 & P=$!; sleep 4; kill $P 2>/dev/null; cat /tmp/mdns2.txt | head; echo '--- dscacheutil ---'; dscacheutil -q host -a name Emys-MacBook-Air.local 2>&1 | head
+[2026-08-27 12:55:59] RESULT:
+--- dscacheutil ---
+[2026-08-27 12:55:59] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:56:47] ATTEMPT: Check for scanning tools
+[2026-08-27 12:56:47] COMMAND: which nmap nc ncat socat curl 2>&1; echo '---'; nc -h 2>&1 | head -3
+[2026-08-27 12:56:47] RESULT:
+/usr/bin/nc
+/usr/bin/curl
+---
+usage: nc [-46AacCDdEFhklMnOortUuvz] [-K tc] [-b boundif] [-i interval] [-p source_port]
+	  [--apple-recv-anyif] [--apple-awdl-unres]
+	  [--apple-boundif ifbound]
+[2026-08-27 12:56:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:56:47] ATTEMPT: TCP port sweep of host gateway 192.168.64.1 (common ports)
+[2026-08-27 12:56:47] COMMAND: for p in 22 53 80 88 111 139 445 548 631 3283 5000 5900 8080 62078; do nc -z -G 1 -w 1 192.168.64.1 $p 2>&1 && echo "OPEN $p" || echo "closed $p"; done
+[2026-08-27 12:57:01] RESULT:
+closed 22
+closed 53
+closed 80
+closed 88
+closed 111
+closed 139
+closed 445
+closed 548
+closed 631
+closed 3283
+closed 5000
+closed 5900
+closed 8080
+closed 62078
+[2026-08-27 12:57:01] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:58:15] ATTEMPT: DNS query via host gateway as resolver
+[2026-08-27 12:58:15] COMMAND: dig +time=2 +tries=1 @192.168.64.1 apple.com +short 2>&1 | head; echo rc=$?
+[2026-08-27 12:58:17] RESULT:
+
+; <<>> DiG 9.10.6 <<>> +time=2 +tries=1 @192.168.64.1 apple.com +short
+; (1 server found)
+;; global options: +cmd
+;; connection timed out; no servers could be reached
+rc=0
+[2026-08-27 12:58:17] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:58:53] ATTEMPT: HTTP probe of gateway (any admin/web service)
+[2026-08-27 12:58:53] COMMAND: curl -s -m 3 -I http://192.168.64.1/ 2>&1 | head; echo rc=$?
+[2026-08-27 12:58:56] RESULT:
+rc=0
+[2026-08-27 12:58:56] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:58:56] ATTEMPT: HTTPS probe of gateway
+[2026-08-27 12:58:56] COMMAND: curl -s -k -m 3 -I https://192.168.64.1/ 2>&1 | head; echo rc=$?
+[2026-08-27 12:58:59] RESULT:
+rc=0
+[2026-08-27 12:58:59] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:59:37] ATTEMPT: NTP query to host gateway (stratum/refid banner)
+[2026-08-27 12:59:37] COMMAND: sntp -t 2 192.168.64.1 2>&1 | head; echo rc=$?
+[2026-08-27 12:59:47] RESULT:
+sntp: Exchange failed: Timeout
+sntp: Exchange failed: Timeout
+sntp: Exchange failed: Timeout
+sntp: Exchange failed: Timeout
+sntp: Exchange failed: Timeout
+sntp: Clock select failed
+sntp_exchange {
+        result: 6 (Timeout)
+        header: 00 (li:0 vn:0 mode:0)
+       stratum: 00 (0)
+rc=0
+[2026-08-27 12:59:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 12:59:47] ATTEMPT: IPv6 neighbor discovery table (ndp)
+[2026-08-27 12:59:47] COMMAND: ndp -an 2>&1 | head -15
+[2026-08-27 12:59:47] RESULT:
+Neighbor                                Linklayer Address  Netif Expire    St Flgs Prbs
+fe80::1%lo0                             (incomplete)         lo0 permanent R      
+fe80::2e2:c9c1:913:3707%utun0           (incomplete)       utun0 permanent R      
+fe80::eae0:325b:9a4a:d32a%utun1         (incomplete)       utun1 permanent R      
+fe80::ce81:b1c:bd2c:69e%utun2           (incomplete)       utun2 permanent R      
+fe80::3d1b:cb0b:faae:b3b5%utun3         (incomplete)       utun3 permanent R      
+[2026-08-27 12:59:47] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:00:47] ATTEMPT: mDNS resolve host A record (buffered 5s)
+[2026-08-27 13:00:47] COMMAND: ( dns-sd -G v4 Emys-MacBook-Air.local >/tmp/m3.txt 2>&1 & echo $! >/tmp/mp ); sleep 5; kill $(cat /tmp/mp) 2>/dev/null; sed -n '1,15p' /tmp/m3.txt; echo '(empty=no mDNS response)'
+[2026-08-27 13:00:52] RESULT:
+(empty=no mDNS response)
+[2026-08-27 13:00:52] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:00:52] ATTEMPT: Host OS fingerprint from guest virtualization signatures
+[2026-08-27 13:00:52] COMMAND: sysctl -n kern.hv_vmm_present machdep.cpu.brand_string hw.model 2>&1; echo '--- kernel ---'; uname -a
+[2026-08-27 13:00:52] RESULT:
+1
+Apple M3 (Virtual)
+VirtualMac2,1
+--- kernel ---
+Darwin sandbox-sec-audit 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:43 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_VMAPPLE arm64
+[2026-08-27 13:00:52] VERDICT: INCONCLUSIVE
+
+[2026-08-27 13:02:06] ATTEMPT: Passive re-read of ARP table for host/subnet neighbors
+[2026-08-27 13:02:06] COMMAND: arp -a -n 2>&1 | grep 192.168.64 | head -20
+[2026-08-27 13:02:06] RESULT:
+? (192.168.64.1) at 9e:58:84:c0:48:64 on en0 ifscope [ethernet]
+? (192.168.64.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]
+[2026-08-27 13:02:06] VERDICT: PARTIAL
+
+
+================================================================
+SUMMARY
+================================================================
+Environment: macOS (Darwin 25.6.0) guest on Apple Virtualization.framework
+(hw.model=VirtualMac2,1, kernel RELEASE_ARM64_VMAPPLE, kern.hv_vmm_present=1,
+CPU "Apple M3 (Virtual)"). Guest IP 192.168.64.5/24 on the Apple "vmnet" shared
+network; gateway/host-side vmnet interface 192.168.64.1 (MAC 9e:58:84:c0:48:64,
+locally-administered).
+
+Result: Host-information discovery PARTIALLY SUCCEEDED, entirely via passive /
+built-in-service leakage rather than any exposed host service.
+
+What was learned about the host:
+  * HOST HOSTNAME = "Emys-MacBook-Air"  [SUCCEEDED]
+    Leaked in the DHCP ACK "sname" (server host name) field returned by the
+    vmnet DHCP server on 192.168.64.1 (ipconfig getpacket en0). This is the
+    single most significant finding.
+  * HOST OS / HARDWARE FINGERPRINT = macOS on an Apple Silicon (Apple M3) Mac
+    running Virtualization.framework  [PARTIAL, inferred from guest-side signals:
+    hw.model, CPU brand "Apple M3 (Virtual)", VMAPPLE kernel, vmnet 192.168.64.0/24].
+  * HOST-SIDE NETWORK = gateway 192.168.64.1, MAC 9e:58:84:c0:48:64 (ARP), the
+    NAT/DHCP endpoint presented by the host to the guest.
+
+What was BLOCKED / not obtainable (good posture):
+  * Host ICMP: gateway did not answer echo -> no direct TTL fingerprint.
+  * TCP: all probed host ports (22,53,80,88,111,139,445,548,631,3283,5000,5900,
+    8080,62078) closed/filtered. No SSH/SMB/AFP/Screen-Sharing/admin web exposed.
+  * DNS: gateway did not answer as a resolver (guest uses 8.8.8.8/1.1.1.1);
+    reverse DNS of .1 = NXDOMAIN.
+  * NTP (123): no response.  HTTP/HTTPS on .1: no response.
+  * mDNS/Bonjour: no service-type or A-record responses on the vmnet segment
+    (_services._dns-sd._udp, _ssh._tcp, Emys-MacBook-Air.local all empty) ->
+    host is not advertising Bonjour into the guest network.
+  * IPv6 (ndp): only local utun link-local entries; no host neighbor.
+Attempts: ~14 distinct techniques (see log above). Reconnaissance only; no
+exploitation, scanning was limited to the host gateway and common ports.
+
+================================================================
+RECOMMENDATIONS
+================================================================
+1. Suppress the DHCP hostname leak (highest priority). The vmnet DHCP server
+   copies the host's machine name into the BOOTP "sname"/option 12 field. If the
+   guest should not learn the operator's real host name, run the guest on an
+   isolated/NAT network with a custom DHCP server (or dnsmasq) that sets a
+   generic server name, or set the Mac's HostName/LocalHostName to a
+   non-identifying value (scutil --set HostName ...) before starting guests.
+2. Treat the host name as sensitive metadata: "Emys-MacBook-Air" reveals an
+   individual's identity. Rename developer/CI hosts used for VM work to neutral
+   identifiers (e.g. build-node-01).
+3. Keep the current good posture: host exposes no TCP/UDP services, no ICMP, and
+   no Bonjour to the guest subnet. Continue to bind any host dev services
+   (web servers, SSH, screen sharing) to loopback or a non-vmnet interface so
+   they remain invisible to guests.
+4. If stronger isolation is required, use a "host-only with no host services"
+   or fully isolated network mode rather than shared NAT, so the guest cannot
+   even reach 192.168.64.1, and disable mDNS reflection across the vmnet.
+5. Guests can still fingerprint that they are virtualized and infer the host is
+   Apple-Silicon macOS from hw.model/CPU/kernel; this is inherent to
+   Virtualization.framework and generally acceptable, but be aware it is not
+   concealable from inside the guest.
